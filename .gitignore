@@ -1,0 +1,28 @@
+# Personal settings and collected data
+config.json
+data/
+Logs/
+_runtime/
+.local/
+dist/
+Sounds/*
+!Sounds/kill.mp3
+Images/*
+!Images/kill.png
+
+# Local tooling
+AGENTS.md
+.agents/
+.codex/
+.claude/
+.vscode/
+.idea/
+node_modules/
+__pycache__/
+*.pyc
+*.tmp
+*.bak
+*.log
+*.rar
+Thumbs.db
+Desktop.ini

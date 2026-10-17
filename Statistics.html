@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hunt Tracker | Статистика</title>
+  <link rel="stylesheet" href="statistics.css">
+</head>
+<body>
+  <main id="statistics" hidden aria-label="Статистика Hunt">
+    <header><span class="eyebrow">HUNT TRACKER</span><span id="status">Ожидание</span></header>
+    <h1>За сессию</h1>
+    <div class="counters">
+      <section data-field="kills"><span>Убийства</span><strong id="kills">0</strong></section>
+      <section data-field="deaths"><span>Смерти</span><strong id="deaths">0</strong></section>
+      <section data-field="kd"><span>K/D</span><strong id="kd">0.00</strong></section>
+      <section data-field="games"><span>Матчи</span><strong id="games">0</strong></section>
+    </div>
+    <section class="detail" data-field="survival"><h2>Выживаемость <small>оценка</small></h2><strong id="survival">Нет данных</strong><p id="outcomes"></p></section>
+    <section class="detail" data-field="maps"><h2>Частота карт</h2><div id="maps"></div></section>
+    <section class="detail" data-field="current"><h2>Последний матч</h2><p id="current"></p></section>
+    <section class="detail" data-field="unknown"><span>Неопределенные события</span><strong id="unknown">0</strong></section>
+    <footer>По данным логов. Возможны ошибки.</footer>
+  </main>
+  <script src="statistics.js"></script>
+</body>
+</html>

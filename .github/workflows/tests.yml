@@ -1,0 +1,17 @@
+name: Tests
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check application
+        shell: powershell
+        run: ./scripts/Test.ps1
+      - name: Build portable package
+        shell: powershell
+        run: ./scripts/Package.ps1
