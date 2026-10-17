@@ -11,7 +11,7 @@ try {
         Copy-Item -LiteralPath (Join-Path $root $name) -Destination $build
     }
     [void][IO.Directory]::CreateDirectory((Join-Path $build 'app'))
-    foreach ($name in @('Tracker.ps1','Files.ps1','Panel.ps1','Dashboard.ps1','Statistics.ps1','Launcher.ps1')) {
+    foreach ($name in @('Tracker.ps1','Alerts.ps1','Files.ps1','Panel.ps1','Dashboard.ps1','Statistics.ps1','Launcher.ps1')) {
         Copy-Item -LiteralPath (Join-Path $root ('app/'+$name)) -Destination (Join-Path $build 'app')
     }
     foreach ($asset in @('Images/kill.png','Sounds/kill.mp3','docs/architecture.md')) {

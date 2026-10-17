@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 $root = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot)).TrimEnd('\')
 . (Join-Path $PSScriptRoot 'Files.ps1')
 . (Join-Path $PSScriptRoot 'Statistics.ps1')
+. (Join-Path $PSScriptRoot 'Alerts.ps1')
 $mutex = [Threading.Mutex]::new($false,(Get-AppMutexName $root))
 $owns = $false
 $journal = $null
@@ -34,7 +35,7 @@ try {
     $commandIds=[Collections.Generic.HashSet[string]]::new()
     $random=[Random]::new()
     $lastAlertSound=$null
-    $testKills=[Collections.Generic.List[double]]::new()
+    $testAlerts=[Collections.Generic.List[object]]::new()
     $events=[Collections.Generic.List[object]]::new()
     $sounds=@(); $sequence=0L; $kills=$statistics.kills; $deaths=$statistics.deaths; $unknown=$statistics.unknown
     $nextDiscovery=0; $nextSounds=0; $nextCommands=0; $nextPublish=0; $lastHealth=''
@@ -53,16 +54,17 @@ try {
     }
     function Record([string]$Type,$Data) {
         $text = switch ($Type) {
-            'started' { 'Трекер запущен. Ожидание: 300 мс. Game.log: '+$Data.game_log+'; NVIDIA: '+$Data.nvidia_logs }
+            'started' { 'Трекер запущен. Ожидание: '+$Data.delay_ms+' мс. Game.log: '+$Data.game_log+'; NVIDIA: '+$Data.nvidia_logs }
             'stopped' { 'Трекер остановлен. Убийств: '+$Data.kills+'; смертей: '+$Data.deaths+'; неопределённых событий: '+$Data.unknown }
             'game_connection' { if ($Data.pid) { 'Игра запущена. PID: '+$Data.pid } else { 'Ожидание запуска игры.' } }
             'log_status' { 'Чтение логов: Game.log - '+$(if ($Data.game) { 'доступен' } else { 'не готов' })+'; NVIDIA - '+$(if ($Data.nvidia) { 'доступен' } else { 'не готов' }) }
             'highlight' { 'Событие NVIDIA. Запрос: '+$Data.request }
             'death_screen_opened' { 'Открылся экран смерти. Время чтения от запуска: '+$Data.read_ms+' мс' }
             'kill' { 'Предполагаемое убийство. Событие передано оверлею.' }
-            'death' { 'Смерть по экрану смерти. Алерт подавлен.' }
+            'death' { 'Смерть по экрану смерти.' }
             'unknown' { 'Событие не определено. Алерт подавлен. Причина: '+$Data.reason }
-            'test' { if ($Data.event_type -eq 'kill') { 'Тест убийства принят.' } else { 'Тест смерти принят. Алерт подавлен.' } }
+            'trade' { 'Предполагаемый размен: два события NVIDIA и один экран смерти.' }
+            'test' { 'Тест принят: '+$Data.event_type+$(if ($Data.suppressed) { '. Алерт подавлен выбранным режимом.' } else { '.' }) }
             'test_alert' { 'Тестовый алерт отправлен.' }
             'error' { 'Ошибка: '+$Data.message }
             default { $Type }
@@ -78,10 +80,11 @@ try {
             $readableJournal.WriteLine(('['+[DateTimeOffset]::Now.ToString('yyyy-MM-dd HH:mm:ss.fff zzz')+'] '+$text))
         } catch { $script:logError='Не удалось записать журнал. Проверьте свободное место и доступ к папке Logs.'; $script:dirty=$true }
     }
-    function Emit-Kill([bool]$Test) {
+    function Emit-Alert([string]$Kind,[bool]$Test,[string]$Mode) {
+        if (-not (Test-AlertEnabled $Mode $Kind)) { return }
         $script:sequence++
         $script:lastAlertSound=if ($sounds.Count) { $sounds[$random.Next($sounds.Count)] } else { $null }
-        $events.Add(@{id=$script:sequence;type='kill';at=[DateTimeOffset]::UtcNow.ToString('o');test=$Test;sound=$script:lastAlertSound})
+        $events.Add(@{id=$script:sequence;type=$Kind;at=[DateTimeOffset]::UtcNow.ToString('o');test=$Test;sound=$script:lastAlertSound})
         if ($events.Count -gt 64) { $events.RemoveAt(0) }
         $script:dirty=$true
     }
@@ -91,12 +94,12 @@ try {
             $script:statisticsDirty=$false
         }
         $state = [ordered]@{
-            session=$session; running=$script:running; updated_at=[DateTimeOffset]::UtcNow.ToString('o'); delay_ms=300
+            session=$session; running=$script:running; updated_at=[DateTimeOffset]::UtcNow.ToString('o'); delay_ms=(Get-AlertDelay $config.alertMode)
             game_log=(Get-PortablePath $game.Path); game_readable=($game.Healthy -and $game.CaughtUp)
             nvidia_folder=(Get-PortablePath $sdkFolder); sdk_log=$(if ($sdk) { Get-PortablePath $sdk.Path } else { '' })
             sdk_readable=($null -ne $sdk -and $sdk.Healthy); game_pid=$gamePid
             kills=$kills; deaths=$deaths; unknown=$unknown; image_found=[IO.File]::Exists((Join-Path $root $config.image))
-            image=$config.image; display=$config.display; statistics=$statistics
+            image=$config.image; display=$config.display; alert_mode=$config.alertMode; statistics=$statistics
             sounds=@($sounds); volume=[double]$config.volume; duration_ms=[int]$config.durationMs; events=@($events.ToArray())
             warning=$logError; tracker_pid=$PID
             panel_visible=($null -ne $controlPanel -and [HuntKillWindow]::IsWindowVisible($controlPanel.Form.Handle))
@@ -109,7 +112,7 @@ try {
     }
     $stopFile = Join-Path $runtime 'stop.json'
     if ([IO.File]::Exists($stopFile)) { [IO.File]::Delete($stopFile) }
-    Record 'started' @{delay_ms=300;game_log=(Get-PortablePath $game.Path);nvidia_logs=(Get-PortablePath $sdkFolder)}
+    Record 'started' @{delay_ms=(Get-AlertDelay $config.alertMode);game_log=(Get-PortablePath $game.Path);nvidia_logs=(Get-PortablePath $sdkFolder)}
     if ($controlPanel) { Show-ControlPanel $controlPanel }
     while ($running) {
         if ($controlPanel) {
@@ -118,7 +121,7 @@ try {
                 $action=$controlPanel.Actions.Dequeue()
                 if ($action -eq 'stop') {
                     $running=$false
-                    $pending.Clear(); $testKills.Clear()
+                    $pending.Clear(); $testAlerts.Clear()
                     break
                 } elseif ($action -eq 'overlay') {
                     try { Start-Process -FilePath (Join-Path $root 'Overlay.html') -ErrorAction Stop }
@@ -139,15 +142,16 @@ try {
                     try {
                         $statistics=Start-NewStatisticsSession $root $statistics
                         $kills=0; $deaths=0; $unknown=0
-                        $pending.Clear(); $signals.Clear(); $events.Clear(); $testKills.Clear()
+                        $pending.Clear(); $signals.Clear(); $events.Clear(); $testAlerts.Clear()
                         $statisticsDirty=$false; $dirty=$true
                         $controlPanel.Feedback.Text='Начата новая сессия. Предыдущая сохранена в data/sessions.'
                     } catch { $controlPanel.Feedback.Text='Не удалось сохранить сессию. Сбор продолжается с прежними счетчиками. Проверьте доступ к папке data.' }
-                } elseif ($action -in @('kill','death')) {
-                    if ($testKills.Count -ge 16) { $controlPanel.Feedback.Text='Очередь тестов заполнена. Подождите.'; continue }
-                    if ($action -eq 'kill') { $testKills.Add($clock.Elapsed.TotalMilliseconds+300) }
-                    Record 'test' @{event_type=$action;suppressed=($action -eq 'death')}
-                    $controlPanel.Feedback.Text=if ($action -eq 'kill') { 'Тест убийства принят. Алерт через 300 мс.' } else { 'Тест смерти: алерт подавлен, картинки и звука нет.' }
+                } elseif ($action -in @('kill','death','trade')) {
+                    if ($testAlerts.Count -ge 16) { $controlPanel.Feedback.Text='Очередь тестов заполнена. Подождите.'; continue }
+                    $enabled=Test-AlertEnabled $config.alertMode $action
+                    if ($enabled) { $testAlerts.Add(@{At=$clock.Elapsed.TotalMilliseconds+(Get-AlertDelay $config.alertMode);Kind=$action;Mode=$config.alertMode}) }
+                    Record 'test' @{event_type=$action;suppressed=(-not $enabled)}
+                    $controlPanel.Feedback.Text=if ($enabled) { 'Тест принят. Алерт через '+(Get-AlertDelay $config.alertMode)+' мс. Статистика не изменится.' } else { 'Тест: алерт подавлен выбранным режимом. Сначала сохраните нужный режим.' }
                 }
             }
         }
@@ -203,25 +207,40 @@ try {
                 $seenOrder.Enqueue($id)
                 if ($seenOrder.Count -gt 8192) { [void]$seen.Remove($seenOrder.Dequeue()) }
                 $at=$sdkReadAt
-                $pending.Add([pscustomobject]@{Id=$id;At=$at;Epoch=$epoch;GameAvailable=($game.Healthy -and $game.CaughtUp);GameGeneration=$game.Generation;MatchId=$(if ($statistics.current) { $statistics.current.id } else { '' })})
+                $pending.Add([pscustomobject]@{Id=$id;At=$at;Mode=$config.alertMode;TradeBlocked=$false;Epoch=$epoch;GameAvailable=($game.Healthy -and $game.CaughtUp);GameGeneration=$game.Generation;MatchId=$(if ($statistics.current) { $statistics.current.id } else { '' })})
                 Record 'highlight' @{request=$id;read_ms=[Math]::Round($at,3);epoch=$epoch}
             }
         }
         $now=$clock.Elapsed.TotalMilliseconds
         foreach ($h in $pending.ToArray()) {
-            if ($now-$h.At -lt 300 -or $now-$gameReadAt -gt 100) { continue }
+            if (-not $pending.Contains($h) -or $now-$h.At -lt (Get-AlertDelay $h.Mode) -or $now-$gameReadAt -gt 100) { continue }
+            $pair=Find-TradePair $h $pending $signals $game $epoch
+            if ($pair) {
+                $pair.Signal.Used=$true
+                $kills++; $deaths++; $statistics.trades++
+                Add-StatisticsCombat $statistics 'kill' $h.MatchId
+                Add-StatisticsCombat $statistics 'death' $h.MatchId
+                Emit-Alert 'trade' $false $h.Mode
+                Record 'trade' @{requests=@($h.Id,$pair.Other.Id);wait_ms=[Math]::Round($now-$h.At,3)}
+                [void]$pending.Remove($h); [void]$pending.Remove($pair.Other)
+                $statisticsDirty=$true; $dirty=$true
+                continue
+            }
             $ambiguous=$false
-            $signal = $signals | Where-Object { -not $_.Used -and $_.Epoch -eq $h.Epoch -and [Math]::Abs($_.At-$h.At) -le 400 } | Sort-Object { [Math]::Abs($_.At-$h.At) } | Select-Object -First 1
+            $screenWindow=if ($h.Mode -eq 'trades') { 500 } else { 400 }
+            $signal = $signals | Where-Object { -not $_.Used -and $_.Epoch -eq $h.Epoch -and [Math]::Abs($_.At-$h.At) -le $screenWindow } | Sort-Object { [Math]::Abs($_.At-$h.At) } | Select-Object -First 1
             if ($signal) {
                 $ambiguous = $null -ne ($pending | Where-Object { $_ -ne $h -and $_.Epoch -eq $signal.Epoch -and [Math]::Abs([Math]::Abs($_.At-$signal.At)-[Math]::Abs($h.At-$signal.At)) -le 25 } | Select-Object -First 1)
                 $closer = $pending | Where-Object { $_ -ne $h -and $_.Epoch -eq $signal.Epoch -and [Math]::Abs($_.At-$signal.At) -lt [Math]::Abs($h.At-$signal.At) } | Select-Object -First 1
                 if ($closer) { $signal=$null }
             }
             $reason=''
-            if ($ambiguous) { $kind='unknown'; $unknown++; $reason='несколько событий NVIDIA слишком близко к экрану смерти' }
+            if ($h.Epoch -ne $epoch) { $kind='unknown'; $unknown++; $reason='сменился матч или лог' }
+            elseif ($ambiguous) { $kind='unknown'; $unknown++; $reason='несколько событий NVIDIA слишком близко к экрану смерти' }
             elseif ($signal) { $signal.Used=$true; $kind='death'; $deaths++ }
             elseif (-not $h.GameAvailable -or -not $game.Healthy -or -not $game.CaughtUp -or $h.GameGeneration -ne $game.Generation) { $kind='unknown'; $unknown++; $reason='Game.log был недоступен, заменён или ещё не прочитан' }
-            else { $kind='kill'; $kills++; Emit-Kill $false }
+            else { $kind='kill'; $kills++ }
+            Emit-Alert $kind $false $h.Mode
             Add-StatisticsCombat $statistics $kind $h.MatchId
             $statisticsDirty=$true
             Record $kind @{request=$h.Id;reason=$reason;wait_ms=[Math]::Round($now-$h.At,3);screen_gap_ms=$(if ($signal) { [Math]::Round($signal.At-$h.At,3) } else { $null })}
@@ -248,9 +267,10 @@ try {
                     if (-not $command -or -not $command.PSObject.Properties['session'] -or -not $command.PSObject.Properties['type'] -or $command.session -isnot [string] -or $command.type -isnot [string]) { [IO.File]::Delete($file.FullName); continue }
                     $commandId=[guid]::Empty
                     $validId=$command.PSObject.Properties['id'] -and [guid]::TryParse([string]$command.id,[ref]$commandId)
-                    if ($validId -and $command.session -eq $session -and $command.type -in @('kill','death') -and $testKills.Count -lt 16 -and $commandIds.Count -lt 10000 -and $commandIds.Add($commandId.ToString('N'))) {
-                        if ($command.type -eq 'kill') { $testKills.Add($clock.Elapsed.TotalMilliseconds+300) }
-                        Record 'test' @{event_type=$command.type;suppressed=($command.type -eq 'death')}
+                    if ($validId -and $command.session -eq $session -and $command.type -in @('kill','death','trade') -and $testAlerts.Count -lt 16 -and $commandIds.Count -lt 10000 -and $commandIds.Add($commandId.ToString('N'))) {
+                        $enabled=Test-AlertEnabled $config.alertMode $command.type
+                        if ($enabled) { $testAlerts.Add(@{At=$clock.Elapsed.TotalMilliseconds+(Get-AlertDelay $config.alertMode);Kind=$command.type;Mode=$config.alertMode}) }
+                        Record 'test' @{event_type=$command.type;suppressed=(-not $enabled)}
                     }
                     [IO.File]::Delete($file.FullName)
                 } catch { if (($file.LastWriteTimeUtc-[DateTime]::UtcNow).TotalSeconds -lt -10) { try { [IO.File]::Delete($file.FullName) } catch {} } }
@@ -259,8 +279,8 @@ try {
                 try { $stop = (Read-SharedText $stopFile) | ConvertFrom-Json; if ($stop.session -eq $session) { $running=$false }; [IO.File]::Delete($stopFile) } catch {}
             }
         }
-        if (-not $running) { $pending.Clear(); $testKills.Clear(); break }
-        foreach ($due in $testKills.ToArray()) { if ($now -ge $due) { Emit-Kill $true; Record 'test_alert' @{}; [void]$testKills.Remove($due) } }
+        if (-not $running) { $pending.Clear(); $testAlerts.Clear(); break }
+        foreach ($due in $testAlerts.ToArray()) { if ($now -ge $due.At) { Emit-Alert $due.Kind $true $due.Mode; Record 'test_alert' @{}; [void]$testAlerts.Remove($due) } }
         if ($now -ge $nextSounds) {
             $nextSounds=$now+2000
             $soundFolder = Join-Path $root 'Sounds'
@@ -277,7 +297,7 @@ try {
             }
         }
         # Start-Sleep can discard queued Windows restore commands in this UI loop.
-        if ($running) { [Threading.Thread]::Sleep($(if ($gamePid -or $testKills.Count) { 25 } else { 100 })) }
+        if ($running) { [Threading.Thread]::Sleep($(if ($gamePid -or $testAlerts.Count) { 25 } else { 100 })) }
     }
     $events.Clear()
     Complete-StatisticsMatch $statistics 'tracker_stopped'
@@ -292,7 +312,7 @@ try {
     if ($owns -and (Test-Path variable:running)) { $running=$false; try { Publish } catch {} }
     exit 1
 } finally {
-    if ($controlPanel) { $controlPanel.Form.Dispose() }
+    if ($controlPanel) { $controlPanel.Tips.Dispose(); $controlPanel.Form.Dispose() }
     if ($journal) { $journal.Dispose() }
     if ($readableJournal) { $readableJournal.Dispose() }
     if ($owns) { $mutex.ReleaseMutex() }

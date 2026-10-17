@@ -45,17 +45,30 @@ function Update-ControlPanel($Panel,$State) {
         if ($State.display.alerts -or $State.display.stats -or 'kd' -in $State.display.fields -or $State.volume -ne 0.25) { throw 'Saved settings not applied to publication' }
         $saved=Read-AppConfig $root
         if ($saved.display.alerts -or $saved.display.stats -or 'kd' -in $saved.display.fields) { throw 'Saved settings did not reach disk' }
+        $Panel.AlertMode.SelectedIndex=2
+        $script:panelTestPhase=30
+        $Panel.Buttons.save.PerformClick()
+    } elseif ($script:panelTestPhase -eq 30) {
+        if ($State.alert_mode -ne 'trades' -or $State.delay_ms -ne 500 -or (Read-AppConfig $root).alertMode -ne 'trades') { throw 'Trade mode save failed' }
+        if (-not $Panel.Tips.GetToolTip($Panel.AlertMode) -or -not $Panel.Tips.GetToolTip($Panel.Numbers.durationMs)) { throw 'Setting tooltips missing' }
+        if ($Panel.Cards.kills.Text -ne '0' -or $Panel.Cards.deaths.Text -ne '0') { throw 'Native cards missing with overlays disabled' }
+        $script:panelTestPhase=31
+        $Panel.Buttons.trade.PerformClick()
+    } elseif ($script:panelTestPhase -eq 31 -and $State.events.Count -eq 2) {
+        if ($State.events[1].type -ne 'trade' -or -not $State.events[1].test -or $State.statistics.trades -ne 0) { throw 'Trade test changed real statistics' }
         $script:oldStatsId=$statistics.id
         Add-StatisticsCombat $statistics 'kill' ''
         $script:kills=$statistics.kills
         $script:statisticsDirty=$true
         $script:panelTestPhase=4
+        $Panel.Tabs.SelectedIndex=0
         $Panel.Buttons['new-session'].PerformClick()
     } elseif ($script:panelTestPhase -eq 4) {
         if ($State.statistics.id -eq $script:oldStatsId -or $State.kills -ne 0) { throw 'New session did not reset counters' }
         $archived=Get-Content (Join-Path $root ('data/sessions/'+$script:oldStatsId+'.json')) -Raw | ConvertFrom-Json
         if ($archived.kills -ne 1) { throw 'New session did not preserve old statistics' }
         $script:panelTestPhase=5
+        $Panel.Tabs.SelectedIndex=1
         $Panel.Buttons['kill'].PerformClick()
         $Panel.Form.Close()
         if (-not $Panel.Form.Tag.Closing -or $Panel.Actions.Count -ne 1 -or $Panel.Actions.Peek() -ne 'stop') { throw 'Close must replace pending actions with stop' }

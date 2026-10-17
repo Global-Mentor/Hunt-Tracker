@@ -81,8 +81,30 @@ async function fixture({ mute = false, test = false, blocked = false, staleQueue
   await poll(); assert.equal(animations.length, 2, 'enabling alerts does not replay hidden events');
   state.running = false; state.events.push({ id: 3, type: 'kill', at: new Date(now).toISOString() });
   await poll(); assert.equal(animations.length, 2, 'stop prevents alerts');
+  state.running = true; state.events = []; state.sounds = [];
+  state.alert_mode = 'kills-deaths';
+  state.events.push({ id: 10, type: 'death', at: new Date(now).toISOString() });
+  await poll(); image.onload();
+  assert.equal(image.className, 'death'); assert.equal(element('event-label').textContent, 'Смерть');
+  animations.at(-1).onfinish(); assert.equal(element('event-label').textContent, '');
+  const count = animations.length;
+  state.events.push({ id: 11, type: 'trade', at: new Date(now).toISOString() });
+  await poll(); assert.equal(animations.length, count, 'trade hidden outside trade mode');
+  state.alert_mode = 'trades';
+  await poll(); assert.equal(animations.length, count, 'changing mode does not replay events');
+  state.events.push({ id: 12, type: 'trade', at: new Date(now).toISOString() });
+  await poll(); image.onload();
+  assert.equal(image.className, 'trade'); assert.equal(element('event-label').textContent, 'Размен');
+  state.events.push({ id: 13, type: 'death', at: new Date(now).toISOString() });
+  await poll();
+  state.alert_mode = 'kills'; await poll();
+  assert(animations.at(-1).cancelled, 'changing mode cancels active alert and queue');
+  assert.equal(element('event-label').textContent, '');
+  state.running = false; await poll();
+  assert.equal(element('event-label').textContent, '', 'stopped alert label hidden');
+
 }
 (async () => {
   await fixture(); await fixture({ mute: true }); await fixture({ blocked: true }); await fixture({ staleQueue: true });
-  console.log('PASS: local script polling, kill-only alerts, baseline, dedup, queue, MP3 paths, mute, stale events, stop.');
+  console.log('PASS: local script polling, three alert modes, mode changes, baseline, dedup, queue, MP3 paths, mute, stale events, stop.');
 })().catch(e => { console.error(e); process.exitCode = 1; });

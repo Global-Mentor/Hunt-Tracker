@@ -3,11 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hunt Tracker | Алерт убийства</title>
+  <title>Hunt Tracker | Алерты</title>
   <style>
     html,body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; }
     body { display:grid; place-items:center; }
     #skull { width:78px; max-width:calc(100vw - 16px); max-height:calc(100vh - 12px); object-fit:contain; opacity:0; filter:drop-shadow(0 2px 5px #000); }
+    #skull.death { filter:sepia(1) saturate(4) hue-rotate(315deg) drop-shadow(0 2px 5px #000); }
+    #skull.trade { filter:sepia(1) saturate(1.6) drop-shadow(0 2px 5px #000); }
+    #event-label { position:absolute; top:calc(50% + 42px); color:#d7c68b; font:14px Georgia,serif; text-shadow:0 2px 3px #000; }
+    #event-label.death { color:#e2a398; }
     #message { color:#ddd; font:12px Arial; position:absolute; }
     #audio-unlock { position:absolute; z-index:10; left:50%; top:50%; transform:translate(-50%,-50%); box-sizing:border-box; width:calc(100vw - 12px); max-width:240px; min-height:64px; max-height:calc(100vh - 8px); padding:8px; background:#ead393; color:#191b18; border:2px solid #fff2cd; border-radius:4px; box-shadow:0 3px 18px #000b; font:700 16px/1.2 Arial; cursor:pointer; }
     #audio-unlock[hidden] { display:none; }
@@ -17,6 +21,7 @@
 </head>
 <body data-page="overlay">
   <img id="skull" alt="Убийство">
+  <span id="event-label" aria-live="polite"></span>
   <span id="message"></span>
   <button id="audio-unlock" title="Браузер заблокировал автоматический звук. Нажмите, чтобы воспроизвести алерт." hidden>Разрешить<br>звук</button>
   <script src="client.js"></script>

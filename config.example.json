@@ -3,12 +3,13 @@
   "nvidiaLogs": "%LOCALAPPDATA%/NVIDIA Corporation/GfeSDK",
   "volume": 0.5,
   "durationMs": 1800,
+  "alertMode": "kills",
   "image": "Images/kill.png",
   "display": {
     "alerts": true,
     "stats": true,
     "scale": 100,
     "opacity": 90,
-    "fields": ["kills", "deaths", "kd", "games", "survival", "maps", "current", "unknown"]
+    "fields": ["kills", "deaths", "kd", "games"]
   }
 }

@@ -197,7 +197,7 @@ def run():
         assert any(r["type"] == "unknown" for r in records)
         assert records[-1]["type"] == "stopped"
         assert not state()['running']
-        readable = next((app / 'Logs').glob('*.log')).read_text(encoding='utf-8-sig')
+        readable = '\n'.join(log.read_text(encoding='utf-8-sig') for log in (app / 'Logs').glob('*.log'))
         assert 'Алерт подавлен' in readable and 'Звук:' in readable
         assert all('message' in r for r in records)
         saved = json.loads((app / 'data' / 'statistics.json').read_text(encoding='utf-8'))
@@ -210,6 +210,54 @@ def run():
         assert (restarted['kills'], restarted['deaths'], restarted['unknown']) == (5, 3, 3)
         post('/api/stop', restarted['session'])
         tracker.wait(timeout=5)
+        for mode in ('kills-deaths', 'trades'):
+            old_session = state()['session']
+            config['alertMode'] = mode
+            (app / 'config.json').write_text(json.dumps(config), encoding='utf-8')
+            tracker = subprocess.Popen(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', str(app / 'app' / 'Tracker.ps1'), '-GameProcessName', 'HuntCombatFixture'])
+            wait(lambda: state()['running'] and state()['session'] != old_session and state()['sdk_readable'], 'mode restart')
+            initial_kills, initial_deaths = state()['kills'], state()['deaths']
+            assert state()['delay_ms'] == (500 if mode == 'trades' else 300)
+            sdkline(sdk_log, mode.replace('-', '') + 'death')
+            time.sleep(.12)
+            append(game_log, "Starting UI state machine 'death/StateMachine'")
+            wait(lambda: state()['deaths'] == initial_deaths + 1, 'death alert mode')
+            assert state()['events'][-1]['type'] == 'death'
+            assert state()['kills'] == initial_kills and state()['statistics']['trades'] == 0
+            if mode == 'trades':
+                append(game_log, "Stopping UI state machine 'death/StateMachine'")
+                time.sleep(.15)
+                before = len(state()['events'])
+                started_trade = time.monotonic()
+                append(sdk_log, 'Posted Request HLSetVideo[trade1]\nPosted Request HLSetVideo[trade2]')
+                time.sleep(.12)
+                append(game_log, "Starting UI state machine 'death/StateMachine'")
+                time.sleep(.20)
+                assert state()['statistics']['trades'] == 0, 'trade before 500ms gate'
+                wait(lambda: state()['statistics']['trades'] == 1, 'one combined trade')
+                assert 500 <= (time.monotonic() - started_trade) * 1000 < 1600
+                assert len(state()['events']) == before + 1 and state()['events'][-1]['type'] == 'trade'
+                assert state()['kills'] == initial_kills + 1 and state()['deaths'] == initial_deaths + 2
+                assert state()['statistics']['kills'] == state()['kills'] and state()['statistics']['deaths'] == state()['deaths']
+                # Three simultaneous requests must remain ambiguous after the first is removed.
+                append(game_log, "Stopping UI state machine 'death/StateMachine'")
+                time.sleep(.2)
+                append(sdk_log, 'Posted Request HLSetVideo[triple1]\nPosted Request HLSetVideo[triple2]\nPosted Request HLSetVideo[triple3]')
+                time.sleep(.1)
+                append(game_log, "Starting UI state machine 'death/StateMachine'")
+                time.sleep(.7)
+                assert state()['statistics']['trades'] == 1, 'ambiguous burst became a trade'
+                # Tests emit alerts but do not alter counters.
+                counters = {key: state()['statistics'][key] for key in ('kills', 'deaths', 'trades', 'unknown')}
+                before = len(state()['events'])
+                post('/api/trade', state()['session'])
+                wait(lambda: len(state()['events']) == before + 1, 'trade test command')
+                assert state()['events'][-1]['test'] and state()['events'][-1]['type'] == 'trade'
+                assert counters == {key: state()['statistics'][key] for key in counters}
+            assert not state()['display']['alerts'] and not state()['display']['stats'], 'display independence'
+            post('/api/stop', state()['session'])
+            tracker.wait(timeout=5)
+        print('PASS: death alerts, 500ms trade gate, combined event, accurate counters, ambiguous burst, test isolation, headless modes.')
         print("PASS: PowerShell startup, full gameFolder path, 300ms gate (%.0fms publication), kill-only alerts, deaths, nearby events, dedup, file commands, stale sessions, hot MP3, missing/recreated log, PID restart, partial lines, rewrites, single instance, graceful stop, redacted paths and journals." % latency)
     finally:
         if tracker and tracker.poll() is None:

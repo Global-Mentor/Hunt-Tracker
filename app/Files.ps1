@@ -166,6 +166,8 @@ function Read-AppConfig {
             [double]$config.durationMs -lt 300 -or [double]$config.durationMs -gt 10000 -or
             [double]$config.durationMs -ne [Math]::Truncate([double]$config.durationMs)) { throw 'durationMs должен быть целым числом от 300 до 10000.' }
         if (-not $config.PSObject.Properties['image']) { $config | Add-Member image 'Images/kill.png' }
+        if (-not $config.PSObject.Properties['alertMode']) { $config | Add-Member alertMode 'kills' }
+        if ($config.alertMode -isnot [string] -or $config.alertMode -notin @('kills','kills-deaths','trades')) { throw 'alertMode: kills, kills-deaths или trades.' }
         if ($config.image -isnot [string] -or $config.image -notmatch '^Images/[a-zA-Z0-9 _.-]+\.(png|svg|webp|gif|jpg|jpeg)$') { throw 'image должен указывать на файл в Images, например Images/kill.png.' }
         if (-not $config.PSObject.Properties['display']) {
             $config | Add-Member display ([pscustomobject]@{alerts=$true;stats=$true;scale=100;opacity=90;fields=@('kills','deaths','kd','games','survival','maps','current','unknown')})

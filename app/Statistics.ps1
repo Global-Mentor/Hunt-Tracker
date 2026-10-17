@@ -1,7 +1,7 @@
 ﻿function New-Statistics {
     return [pscustomobject]@{
         version=1; id=[guid]::NewGuid().ToString('N'); started_at=[DateTimeOffset]::Now.ToString('o')
-        kills=0; deaths=0; unknown=0; games=0; survived=0; lost=0; unresolved=0
+        kills=0; deaths=0; trades=0; unknown=0; games=0; survived=0; lost=0; unresolved=0
         maps=[pscustomobject]@{cemetery=0;civilwar=0;creek=0;colorado=0}
         current=$null; recent=@()
     }
@@ -13,7 +13,8 @@ function Read-Statistics([string]$Root) {
     try {
         $stats=(Read-SharedText $file 4194304) | ConvertFrom-Json
         if ($stats.version -ne 1) { throw 'Unsupported version' }
-        foreach ($key in @('kills','deaths','unknown','games','survived','lost','unresolved')) {
+        if (-not $stats.PSObject.Properties['trades']) { $stats | Add-Member trades 0 }
+        foreach ($key in @('kills','deaths','trades','unknown','games','survived','lost','unresolved')) {
             if ($null -eq $stats.$key -or $stats.$key -is [string] -or $stats.$key -is [bool] -or [double]$stats.$key -lt 0 -or [double]$stats.$key -ne [Math]::Truncate([double]$stats.$key)) { throw "Invalid $key" }
         }
         foreach ($key in @('id','started_at','maps','current','recent')) {

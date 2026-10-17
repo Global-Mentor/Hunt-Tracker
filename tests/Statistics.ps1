@@ -47,6 +47,10 @@ $fixture=New-TestDirectory 'statistics'
 Save-Statistics $fixture $stats
 $restored=Read-Statistics $fixture
 Assert ($restored.id -eq $stats.id -and $restored.kills -eq 2 -and $restored.games -eq 5) 'Persistence failed'
+$restored.PSObject.Properties.Remove('trades')
+Save-Statistics $fixture $restored
+$restored=Read-Statistics $fixture
+Assert ($restored.trades -eq 0 -and $restored.kills -eq 2) 'Older statistics migration lost counters'
 Feed "Starting UI state machine 'loading/StateMachine'"
 Feed 'transition from state(eLS_Loading) to (eLS_Game)'
 Feed "Starting UI state machine 'death/StateMachine'"
@@ -62,6 +66,14 @@ Assert ($rejected -and $stats.current.status -eq 'loading' -and $stats.kills -eq
 $config=(Get-Content (Join-Path $root 'config.example.json') -Raw) | ConvertFrom-Json
 $config.display.fields=@(); $config.display.stats=$false; $config.display.alerts=$false
 $null=Read-AppConfig $root $config
+$config.PSObject.Properties.Remove('alertMode')
+$config=Read-AppConfig $root $config
+Assert ($config.alertMode -eq 'kills') 'Older config must retain kill-only mode'
+$config.alertMode='invalid'
+$rejected=$false
+try { $null=Read-AppConfig $root $config } catch { $rejected=$true }
+Assert $rejected 'Invalid alert mode accepted'
+$config.alertMode='kills'
 $config.display.scale=0
 $rejected=$false
 try { $null=Read-AppConfig $root $config } catch { $rejected=$true }

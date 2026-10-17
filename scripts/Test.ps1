@@ -14,7 +14,7 @@ try {
             if ($errors.Count) { throw ($errors | Out-String) }
         }
     }
-    foreach ($test in @('Statistics.ps1','test_panel.ps1','Package.ps1')) {
+    foreach ($test in @('Alerts.ps1','Statistics.ps1','test_panel.ps1','Package.ps1')) {
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root ('tests/'+$test))
         if ($LASTEXITCODE -ne 0) { throw "Failed: $test" }
     }

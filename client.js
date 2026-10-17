@@ -15,13 +15,15 @@
       this.animation?.cancel(); this.animation = null;
       this.image.onload = this.image.onerror = null;
       this.image.style.opacity = 0;
+      const label = document.getElementById('event-label');
+      if (label) label.textContent = '';
       const unlock = document.getElementById('audio-unlock');
       if (unlock) { unlock.hidden = true; unlock.onclick = null; }
     }
     push(state, createdAt, event) {
       if (this.queue.length >= 16) return;
       const sounds = Object.prototype.hasOwnProperty.call(event, 'sound') ? event.sound ? [event.sound] : [] : state.sounds;
-      this.queue.push({ sounds, duration_ms: state.duration_ms, volume: state.volume, image: state.image || 'Images/kill.png', createdAt });
+      this.queue.push({ type: event.type, sounds, duration_ms: state.duration_ms, volume: state.volume, image: state.image || 'Images/kill.png', createdAt });
       this.next();
     }
     next() {
@@ -29,6 +31,10 @@
       while (this.queue.length && Date.now() - this.queue[0].createdAt > 10000) this.queue.shift();
       if (!this.queue.length) return;
       const state = this.queue.shift();
+      this.image.className = state.type;
+      this.image.alt = { kill: 'Убийство', death: 'Смерть', trade: 'Размен' }[state.type];
+      const label = document.getElementById('event-label');
+      if (label) { label.textContent = state.type === 'kill' ? '' : this.image.alt; label.className = state.type; }
       this.busy = true;
       let done = false, sound = null, visualDone = false;
       let audioDone = this.muted || !state.sounds.length;
@@ -45,6 +51,7 @@
       this.cancel = () => { visualDone = audioDone = true; finish(); };
       const hide = () => {
         this.image.onload = this.image.onerror = null;
+        if (label) label.textContent = '';
         visualDone = true; finish();
       };
       this.image.onload = () => {
@@ -78,20 +85,23 @@
     }
   }
   const player = new Player(document.getElementById('skull'), new URLSearchParams(location.search).has('mute'));
-  let session = null, seen = new Set(), loading = false;
+  let session = null, seen = new Set(), loading = false, alertMode = 'kills';
   let lastGood = 0;
   function consume(state) {
     const age = Date.now() - Date.parse(state.updated_at);
     const active = state.running && state.display?.alerts !== false && Number.isFinite(age) && age >= -2000 && age < 10000;
     const baseline = session !== state.session;
     if (baseline) { session = state.session; seen.clear(); player?.stop(); }
+    const mode = state.alert_mode || 'kills';
+    if (mode !== alertMode) { player.stop(); alertMode = mode; }
     message('');
     if (!active) player.stop();
     for (const event of state.events) {
       if (seen.has(event.id)) continue;
       seen.add(event.id);
       const eventAge = Date.now() - Date.parse(event.at);
-      if (!baseline && active && event.type === 'kill' && eventAge >= -2000 && eventAge <= 10000) player.push(state, Date.parse(event.at), event);
+      const allowed = event.type === 'kill' || (event.type === 'death' && ['kills-deaths', 'trades'].includes(mode)) || (event.type === 'trade' && mode === 'trades');
+      if (!baseline && active && allowed && eventAge >= -2000 && eventAge <= 10000) player.push(state, Date.parse(event.at), event);
     }
     if (seen.size > 128) seen = new Set([...seen].slice(-64));
   }

@@ -15,18 +15,19 @@ public static class HuntKillWindow {
     $actions = [Collections.Generic.Queue[string]]::new()
     $form = [Windows.Forms.Form]::new()
     $form.Text = 'Hunt Tracker'
-    $form.ClientSize = [Drawing.Size]::new(780,720)
+    $form.ShowIcon=$false
+    $form.ClientSize = [Drawing.Size]::new(860,790)
     $form.MinimumSize = $form.Size
     $form.StartPosition = 'CenterScreen'
     $form.AutoScaleMode = 'Dpi'
     $form.Font = [Drawing.Font]::new('Segoe UI',10)
-    $form.BackColor = [Drawing.Color]::FromArgb(28,30,29)
+    $form.BackColor = [Drawing.Color]::FromArgb(18,20,18)
     $form.ForeColor = [Drawing.Color]::FromArgb(230,228,220)
     $form.Tag = @{Actions=$actions;Closing=$false}
     $title = [Windows.Forms.Label]::new()
     $title.Text = 'Hunt Tracker'
-    $title.Font = [Drawing.Font]::new('Georgia',21)
-    $title.SetBounds(20,16,720,40)
+    $title.Font = [Drawing.Font]::new('Georgia',26)
+    $title.SetBounds(20,15,540,52)
     $form.Controls.Add($title)
     $feedback = [Windows.Forms.Label]::new()
     $feedback.ForeColor = [Drawing.Color]::FromArgb(214,209,170)
