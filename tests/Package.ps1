@@ -86,7 +86,15 @@ public static class BundledRuntimeCheck {
     $reopened=Read-TestJson $file
     if ($reopened.tracker_pid -ne $state.tracker_pid -or $reopened.session -ne $state.session) { throw 'Reopen created second tracker' }
     $info.Arguments='--stop'
-    $locked=[IO.FileStream]::new($file,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None)
+    for ($attempt=0; ; $attempt++) {
+        try {
+            $locked=[IO.FileStream]::new($file,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::None)
+            break
+        } catch [IO.IOException] {
+            if ($attempt -ge 39) { throw }
+            [Threading.Thread]::Sleep(25)
+        }
+    }
     try {
         $stopper=[Diagnostics.Process]::Start($info)
         [Threading.Thread]::Sleep(250)

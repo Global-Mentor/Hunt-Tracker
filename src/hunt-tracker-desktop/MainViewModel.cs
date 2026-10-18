@@ -353,7 +353,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         GameStatus = snapshot.GamePid == 0 ? "Не запущена" : "Запущена";
         GameLogStatus = snapshot.GameReadable ? "Читается" : "Недоступен";
         NvidiaStatus = snapshot.SdkReadable ? "Читается" : snapshot.GamePid == 0 ? "Игра не запущена" : "Лог недоступен";
-        NvidiaStatusHint = snapshot.SdkReadable ? "Сигналы Highlights доступны." : snapshot.GamePid == 0 ? "Чтение начнётся после запуска Hunt." : "Проверьте папку логов и включён ли NVIDIA Highlights в игре.";
+        NvidiaStatusHint = snapshot.SdkReadable ? "Сигналы Highlights доступны." : snapshot.GamePid == 0 ? "Чтение начнётся после запуска Hunt." : "Проверьте путь к логам NVIDIA. Включать запись Highlights в игре не требуется.";
         GameStatusColor = snapshot.GamePid != 0 ? "#A4CFA0" : "#DEC587";
         GameLogStatusColor = snapshot.GameReadable ? "#A4CFA0" : "#DEC587";
         NvidiaStatusColor = snapshot.SdkReadable ? "#A4CFA0" : "#DEC587";
