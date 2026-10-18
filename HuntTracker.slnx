@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/hunt-tracker-core/">
+    <Project Path="src/hunt-tracker-core/HuntTracker.Core.csproj" />
+  </Folder>
+  <Folder Name="/src/hunt-tracker-desktop/">
+    <Project Path="src/hunt-tracker-desktop/HuntTracker.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/hunt-tracker-desktop-tests/">
+    <Project Path="tests/hunt-tracker-desktop-tests/HuntTracker.DesktopTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/hunt-tracker-tests/">
+    <Project Path="tests/hunt-tracker-tests/HuntTracker.Tests.csproj" />
+  </Folder>
+</Solution>

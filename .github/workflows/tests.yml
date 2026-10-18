@@ -8,10 +8,10 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Check application
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Check application and portable package
         shell: powershell
-        run: ./scripts/Test.ps1
-      - name: Build portable package
-        shell: powershell
-        run: ./scripts/Package.ps1
+        run: ./scripts/Test.ps1 -IncludePackage

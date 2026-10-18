@@ -7,12 +7,12 @@
   <style>
     html,body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; }
     body { display:grid; place-items:center; }
-    #skull { width:78px; max-width:calc(100vw - 16px); max-height:calc(100vh - 12px); object-fit:contain; opacity:0; filter:drop-shadow(0 2px 5px #000); }
-    #skull.death { filter:sepia(1) saturate(4) hue-rotate(315deg) drop-shadow(0 2px 5px #000); }
-    #skull.trade { filter:sepia(1) saturate(1.6) drop-shadow(0 2px 5px #000); }
-    #event-label { position:absolute; top:calc(50% + 42px); color:#d7c68b; font:14px Georgia,serif; text-shadow:0 2px 3px #000; }
-    #event-label.death { color:#e2a398; }
-    #message { color:#ddd; font:12px Arial; position:absolute; }
+    #alert-visual { display:flex; align-items:center; justify-content:center; gap:6px; opacity:0; }
+    #skull, #trade-skull { width:78px; max-width:calc(100vw - 16px); max-height:calc(100vh - 28px); object-fit:contain; filter:drop-shadow(0 2px 5px #000); }
+    #alert-visual.trade img { width:54px; max-width:calc((100vw - 22px) / 2); }
+    #skull.death, #trade-skull { filter:url(#death-tint) drop-shadow(0 2px 5px #000); }
+    #trade-skull[hidden] { display:none; }
+    .filters { position:absolute; width:0; height:0; overflow:hidden; }
     #audio-unlock { position:absolute; z-index:10; left:50%; top:50%; transform:translate(-50%,-50%); box-sizing:border-box; width:calc(100vw - 12px); max-width:240px; min-height:64px; max-height:calc(100vh - 8px); padding:8px; background:#ead393; color:#191b18; border:2px solid #fff2cd; border-radius:4px; box-shadow:0 3px 18px #000b; font:700 16px/1.2 Arial; cursor:pointer; }
     #audio-unlock[hidden] { display:none; }
     #audio-unlock:hover { background:#fff0bf; }
@@ -20,10 +20,9 @@
   </style>
 </head>
 <body data-page="overlay">
-  <img id="skull" alt="Убийство">
-  <span id="event-label" aria-live="polite"></span>
-  <span id="message"></span>
+  <svg class="filters" aria-hidden="true"><defs><filter id="death-tint" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values=".183 .615 .062 0 0 .047 .157 .016 0 0 .038 .129 .013 0 0 0 0 0 1 0"/></filter></defs></svg>
+  <div id="alert-visual" role="img" aria-label="Алерт"><img id="skull" alt=""><img id="trade-skull" alt="" hidden></div>
   <button id="audio-unlock" title="Браузер заблокировал автоматический звук. Нажмите, чтобы воспроизвести алерт." hidden>Разрешить<br>звук</button>
-  <script src="client.js"></script>
+  <script src="client.js?v=8"></script>
 </body>
 </html>

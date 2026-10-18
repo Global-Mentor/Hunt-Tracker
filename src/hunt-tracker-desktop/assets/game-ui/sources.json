@@ -1,0 +1,16 @@
+{
+  "source": "Hunt: Showdown 1896",
+  "owner": "Crytek",
+  "archive": "textures-ui-part0.pak",
+  "conversion": "DDS to PNG, original pixels and alpha retained",
+  "assets": {
+    "button-focus.png": "libs/ui/assets/textures/button_hovered.dds",
+    "button-primary.png": "libs/ui/assets/textures/button_normal_cta.dds",
+    "check-frame.png": "libs/ui/assets/textures/checkbox_frame.dds",
+    "check-fill.png": "libs/ui/assets/textures/checkbox_fill.dds",
+    "underline.png": "libs/ui/assets/textures/header_button_underline.dds",
+    "panel.png": "libs/ui/assets/textures/shared_menu/background_384_200.dds",
+    "background.png": "textures/ui/backgrounds/summary_screen_background.dds",
+    "divider.png": "textures/ui/backgrounds/loadout_divider_headline.dds"
+  }
+}

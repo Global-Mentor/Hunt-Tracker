@@ -1,4 +1,4 @@
-﻿param([switch]$IncludeWindowRestore,[switch]$KeepArtifacts)
+﻿param([switch]$IncludeWindowRestore,[switch]$IncludePackage,[switch]$KeepArtifacts)
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 $temporaryRoot=[IO.Path]::GetFullPath([IO.Path]::GetTempPath())
@@ -7,17 +7,14 @@ $testRoot=Join-Path $temporaryRoot ('HuntTrackerTests-'+[guid]::NewGuid().ToStri
 $previousTestRoot=$env:HUNT_TEST_ROOT
 $env:HUNT_TEST_ROOT=$testRoot
 try {
-    foreach ($directory in @('app','scripts','tests')) {
-        foreach ($file in @(Get-ChildItem (Join-Path $root $directory) -Filter *.ps1)) {
-            $tokens=$null; $errors=$null
-            $null=[Management.Automation.Language.Parser]::ParseFile($file.FullName,[ref]$tokens,[ref]$errors)
-            if ($errors.Count) { throw ($errors | Out-String) }
-        }
-    }
-    foreach ($test in @('Alerts.ps1','Statistics.ps1','test_panel.ps1','Package.ps1')) {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root ('tests/'+$test))
-        if ($LASTEXITCODE -ne 0) { throw "Failed: $test" }
-    }
+    & python (Join-Path $root 'tests/test_repository.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Repository privacy checks failed' }
+    & dotnet build (Join-Path $root 'HuntTracker.slnx') -c Release -p:RestoreLockedMode=true --nologo
+    if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+    & dotnet run --project (Join-Path $root 'tests/hunt-tracker-tests/HuntTracker.Tests.csproj') -c Release --no-build
+    if ($LASTEXITCODE -ne 0) { throw 'Core tests failed' }
+    & dotnet run --project (Join-Path $root 'tests/hunt-tracker-desktop-tests/HuntTracker.DesktopTests.csproj') -c Release --no-build
+    if ($LASTEXITCODE -ne 0) { throw 'Desktop tests failed' }
     foreach ($test in @('test_client.cjs','test_statistics.cjs')) {
         & node (Join-Path $root ('tests/'+$test))
         if ($LASTEXITCODE -ne 0) { throw "Failed: $test" }
@@ -27,6 +24,10 @@ try {
     if ($IncludeWindowRestore) {
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'tests/test_window_restore.ps1')
         if ($LASTEXITCODE -ne 0) { throw 'Failed: test_window_restore.ps1' }
+    }
+    if ($IncludePackage) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'tests/Package.ps1')
+        if ($LASTEXITCODE -ne 0) { throw 'Failed: Package.ps1' }
     }
     'All checks passed.'
 } finally {

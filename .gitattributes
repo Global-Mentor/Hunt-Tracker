@@ -6,3 +6,11 @@
 *.html text eol=lf
 *.css text eol=lf
 *.md text eol=lf
+*.cs text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.xaml text eol=lf
+*.slnx text eol=lf
+*.json text eol=lf
+*.py text eol=lf
+*.yml text eol=lf

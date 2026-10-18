@@ -4,12 +4,19 @@
   "volume": 0.5,
   "durationMs": 1800,
   "alertMode": "kills",
-  "image": "Images/kill.png",
   "display": {
-    "alerts": true,
-    "stats": true,
-    "scale": 100,
     "opacity": 90,
-    "fields": ["kills", "deaths", "kd", "games"]
-  }
+    "fields": [
+      "kills",
+      "deaths",
+      "kd",
+      "games"
+    ]
+  },
+  "alertsEnabled": true,
+  "statisticsEnabled": true,
+  "detectTrades": true,
+  "autoRefreshMedia": true,
+  "detailedDiagnostics": false,
+  "statisticsRefreshMs": 1000
 }
